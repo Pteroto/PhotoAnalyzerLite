@@ -15,28 +15,23 @@ import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.util.Log;
-import android.view.TextureView;
 import android.view.View;
 import android.widget.Button;
-import android.widget.ProgressBar;
 
 import com.example.android.tflitecamerademo.Utils.MeasurePerformanceUtil;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
 import java.util.function.Consumer;
-import java.util.stream.Collector;
 import java.util.stream.Stream;
 
 public class MainActivity extends AppCompatActivity {
 
     private static final int INPUT_SIZE = 224;
 
-    private ArrayList<Bitmap> imagesPath;
-    private ArrayList<Bitmap> imagesPathFinal;
+    private ArrayList<Bitmap> loadedImages;
+    private ArrayList<Bitmap> imagesToRemove;
 
     private ProgressDialog dialog;
 
@@ -117,7 +112,7 @@ public class MainActivity extends AppCompatActivity {
         return listOfAllImages;
     }
 
-    private void createResultList(List<List<String>> result, List<Bitmap> photos) {
+     private void createResultList(List<List<String>> result, List<Bitmap> photos) {
         RecyclerView.Adapter mAdapter = new ResultAdapter(photos, result, this);
         mRecyclerView.setAdapter(mAdapter);
         dialog.dismiss();
@@ -133,38 +128,18 @@ public class MainActivity extends AppCompatActivity {
             //long startTime = System.currentTimeMillis();
             Log.d("test", "images getted: " + strings[0].size());
             final List<List<String>> resultList = new ArrayList<>();
-            imagesPathFinal = new ArrayList<>();
-            imagesPath = new ArrayList<>();
+            imagesToRemove = new ArrayList<>();
+            loadedImages = new ArrayList<>();
 
-            Stream photos = strings[0].stream().parallel();
+            ArrayList<String> imageList = strings[0];
+
+            Stream photos = imageList.stream().parallel();
             if (photos.isParallel()) {
-                photos.forEach(o -> {
-                    calculatePhoto((String) o, imagesPath);
-                });
-                Log.d("test", "teste");
+                photos.forEach((Consumer<String>) photo ->
+                        calculatePhoto(photo, loadedImages));
             }
 
-            for (Bitmap photo : imagesPath) {
-                //measurePerformanceUtil.addStartTime();
-
-//                BitmapFactory.Options options = new BitmapFactory.Options();
-////                options.inJustDecodeBounds = true;
-////                BitmapFactory.decodeFile(photo, options);
-////
-////                options.inSampleSize = calculateInSampleSize(options, INPUT_SIZE, INPUT_SIZE);
-////                options.inJustDecodeBounds = false;
-////
-////                Bitmap image = BitmapFactory.decodeFile(photo, options);
-//
-//
-//                options.inSampleSize = 2;
-//
-//                Bitmap image = BitmapFactory.decodeFile(photo, options);
-//
-////                Bitmap image = BitmapFactory.decodeFile(photo);
-//
-//                measurePerformanceUtil.logMeasuredTime("Decoded Bitmap Single");
-
+            for (Bitmap photo : loadedImages) {
                 measurePerformanceUtil.addStartTime();
                 Bitmap scaledBitmap = Bitmap.createScaledBitmap(photo, INPUT_SIZE, INPUT_SIZE, false);
                 measurePerformanceUtil.logMeasuredTime("Scaled Bitmap Single");
@@ -176,7 +151,7 @@ public class MainActivity extends AppCompatActivity {
                 measurePerformanceUtil.logMeasuredTime("Recognized Image Time Single");
 
                 if (results.get(1).contains("common")) {
-                    imagesPathFinal.add(photo);
+                    imagesToRemove.add(photo);
                 } else {
                     resultList.add(results);
                 }
@@ -188,17 +163,17 @@ public class MainActivity extends AppCompatActivity {
             //long estimatedTime = System.currentTimeMillis() - startTime;
             //Log.d("test", "TOTAL TIME: " + String.valueOf(estimatedTime / 1000) + "s" + "  ::  TOTAL PHOTOS: " + strings[0].size());
 
-            imagesPath.removeAll(imagesPathFinal);
-            Log.d("test", "Images Blurred: " + imagesPath.size());
+            loadedImages.removeAll(imagesToRemove);
+            Log.d("test", "Images Blurred: " + loadedImages.size());
             return resultList;
         }
 
         @Override
         protected void onPostExecute(List<List<String>> lists) {
-            for (int i = 0; i < imagesPath.size(); i++) {
-                Log.d("ResultList", imagesPath.get(i) + " :: " + lists.get(i).get(0));
+            for (int i = 0; i < loadedImages.size(); i++) {
+                Log.d("ResultList", loadedImages.get(i) + " :: " + lists.get(i).get(1));
             }
-            createResultList(lists, imagesPath);
+            createResultList(lists, loadedImages);
         }
     }
 
@@ -237,7 +212,7 @@ public class MainActivity extends AppCompatActivity {
 //        measurePerformanceUtil.logMeasuredTime("Recognized Image Time Single");
 //
 //        if (results.get(1).contains("common")) {
-//            imagesPathFinal.add(photo);
+//            imagesToRemove.add(photo);
 //        } else {
 //            resultList.add(results);
 //        }
@@ -251,14 +226,14 @@ public class MainActivity extends AppCompatActivity {
         int inSampleSize = 1;
 
         if (height > reqHeight || width > reqWidth) {
-
-            final int halfHeight = height / 2;
-            final int halfWidth = width / 2;
+//
+//            final int halfHeight = height / 2;
+//            final int halfWidth = width / 2;
 
             // Calculate the largest inSampleSize value that is a power of 2 and keeps both
             // height and width larger than the requested height and width.
-            while ((halfHeight / inSampleSize) >= reqHeight
-                    && (halfWidth / inSampleSize) >= reqWidth) {
+            while ((width / inSampleSize) >= reqHeight
+                    && (height / inSampleSize) >= reqWidth) {
                 inSampleSize *= 2;
             }
         }

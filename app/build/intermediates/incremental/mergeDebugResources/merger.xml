@@ -3620,7 +3620,7 @@
         <item name="android:textAppearance">?android:textAppearanceLarge</item>
         <item name="android:lineSpacingMultiplier">1.2</item>
         <item name="android:shadowDy">-6.5</item>
-    </style></file><file path="/Users/gustavo.monteiro/projects/tensorflow/photoanalyzerlite/app/src/main/res/values/colors.xml" qualifiers=""><color name="control_background">#cc4285f4</color><color name="colorPrimary">#3F51B5</color><color name="colorPrimaryDark">#303F9F</color><color name="colorAccent">#FF4081</color></file><file path="/Users/gustavo.monteiro/projects/tensorflow/photoanalyzerlite/app/src/main/res/values/base-strings.xml" qualifiers=""><string name="app_name">TfLiteCameraDemo</string><string name="intro_message">
+    </style></file><file path="/Users/gustavo.monteiro/projects/tensorflow/photoanalyzerlite/app/src/main/res/values/colors.xml" qualifiers=""><color name="control_background">#cc4285f4</color><color name="colorPrimary">#3F51B5</color><color name="colorPrimaryDark">#303F9F</color><color name="colorAccent">#FF4081</color></file><file path="/Users/gustavo.monteiro/projects/tensorflow/photoanalyzerlite/app/src/main/res/values/base-strings.xml" qualifiers=""><string name="app_name">Blur Detection</string><string name="intro_message">
         <![CDATA[
         
             

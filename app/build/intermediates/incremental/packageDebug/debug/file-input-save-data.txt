@@ -1,5 +1,5 @@
 #Internal package file, do not edit.
-#Thu Nov 01 15:35:52 BRST 2018
+#Wed Dec 05 14:29:41 BRST 2018
 4.path=BUILD
 8.set=NATIVE_RESOURCE
 6.path=lib/x86_64/libtensorflowlite_jni.so
