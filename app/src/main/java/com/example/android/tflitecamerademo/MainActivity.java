@@ -147,12 +147,8 @@ public class MainActivity extends AppCompatActivity {
                     Log.d("test", "positionStart: " + positionStart + "  ::  itemCount: " + itemCount);
 
                     measurePerformanceUtil.addStartTime();
-                    Bitmap scaledBitmap = Bitmap.createScaledBitmap(sender.get(positionStart), INPUT_SIZE, INPUT_SIZE, false);
-                    measurePerformanceUtil.logMeasuredTime("Scaled Bitmap Single");
 
-                    measurePerformanceUtil.addStartTime();
-
-                    List<String> results = classifier.classifyFrame(scaledBitmap);
+                    List<String> results = classifier.classifyFrame(sender.get(positionStart));
 
                     measurePerformanceUtil.logMeasuredTime("Recognized Image Time Single");
 
@@ -231,6 +227,11 @@ public class MainActivity extends AppCompatActivity {
 
         Bitmap image = BitmapFactory.decodeFile(photo, options);
 
+        measurePerformanceUtil.addStartTime();
+
+        image = Bitmap.createScaledBitmap(image, INPUT_SIZE, INPUT_SIZE, false);
+
+        measurePerformanceUtil.logMeasuredTime("Scaled Bitmap Single");
 
 //        options.inSampleSize = 2;
 //
