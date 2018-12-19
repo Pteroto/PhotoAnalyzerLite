@@ -5,6 +5,8 @@ import android.app.Activity;
 import android.app.ProgressDialog;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
+import android.databinding.ObservableArrayList;
+import android.databinding.ObservableList;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
@@ -30,7 +32,7 @@ public class MainActivity extends AppCompatActivity {
 
     private static final int INPUT_SIZE = 224;
 
-    private ArrayList<Bitmap> loadedImages;
+    private ObservableArrayList<Bitmap> loadedImages;
     private ArrayList<Bitmap> imagesToRemove;
 
     private ProgressDialog dialog;
@@ -129,7 +131,46 @@ public class MainActivity extends AppCompatActivity {
             Log.d("test", "images getted: " + strings[0].size());
             final List<List<String>> resultList = new ArrayList<>();
             imagesToRemove = new ArrayList<>();
-            loadedImages = new ArrayList<>();
+            loadedImages = new ObservableArrayList<>();
+
+            loadedImages.addOnListChangedCallback(new ObservableList.OnListChangedCallback<ObservableList<Bitmap>>() {
+                @Override
+                public void onChanged(ObservableList<Bitmap> sender) {
+                }
+
+                @Override
+                public void onItemRangeChanged(ObservableList<Bitmap> sender, int positionStart, int itemCount) {
+                }
+
+                @Override
+                public void onItemRangeInserted(ObservableList<Bitmap> sender, int positionStart, int itemCount) {
+                    Log.d("test", "positionStart: " + positionStart + "  ::  itemCount: " + itemCount);
+
+                    measurePerformanceUtil.addStartTime();
+                    Bitmap scaledBitmap = Bitmap.createScaledBitmap(sender.get(positionStart), INPUT_SIZE, INPUT_SIZE, false);
+                    measurePerformanceUtil.logMeasuredTime("Scaled Bitmap Single");
+
+                    measurePerformanceUtil.addStartTime();
+
+                    List<String> results = classifier.classifyFrame(scaledBitmap);
+
+                    measurePerformanceUtil.logMeasuredTime("Recognized Image Time Single");
+
+                    if (results.get(1).contains("common")) {
+                        imagesToRemove.add(sender.get(positionStart));
+                    } else {
+                        resultList.add(results);
+                    }
+                }
+
+                @Override
+                public void onItemRangeMoved(ObservableList<Bitmap> sender, int fromPosition, int toPosition, int itemCount) {
+                }
+
+                @Override
+                public void onItemRangeRemoved(ObservableList<Bitmap> sender, int positionStart, int itemCount) {
+                }
+            });
 
             ArrayList<String> imageList = strings[0];
 
@@ -139,23 +180,23 @@ public class MainActivity extends AppCompatActivity {
                         calculatePhoto(photo, loadedImages));
             }
 
-            for (Bitmap photo : loadedImages) {
-                measurePerformanceUtil.addStartTime();
-                Bitmap scaledBitmap = Bitmap.createScaledBitmap(photo, INPUT_SIZE, INPUT_SIZE, false);
-                measurePerformanceUtil.logMeasuredTime("Scaled Bitmap Single");
-
-                measurePerformanceUtil.addStartTime();
-
-                List<String> results = classifier.classifyFrame(scaledBitmap);
-
-                measurePerformanceUtil.logMeasuredTime("Recognized Image Time Single");
-
-                if (results.get(1).contains("common")) {
-                    imagesToRemove.add(photo);
-                } else {
-                    resultList.add(results);
-                }
-            }
+//            for (Bitmap photo : loadedImages) {
+//                measurePerformanceUtil.addStartTime();
+//                Bitmap scaledBitmap = Bitmap.createScaledBitmap(photo, INPUT_SIZE, INPUT_SIZE, false);
+//                measurePerformanceUtil.logMeasuredTime("Scaled Bitmap Single");
+//
+//                measurePerformanceUtil.addStartTime();
+//
+//                List<String> results = classifier.classifyFrame(scaledBitmap);
+//
+//                measurePerformanceUtil.logMeasuredTime("Recognized Image Time Single");
+//
+//                if (results.get(1).contains("common")) {
+//                    imagesToRemove.add(photo);
+//                } else {
+//                    resultList.add(results);
+//                }
+//            }
 
             //measurePerformanceUtil.logMeasuredTime("Total time: Decode, scale and recognize images. Total images: " + strings[0].size());
             measurePerformanceUtil.logMeasuredTime("Total time: Decode, scale and recognize images. Total images: " + strings[0].size());
