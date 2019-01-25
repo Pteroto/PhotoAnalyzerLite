@@ -63,8 +63,11 @@ public class MainActivity extends AppCompatActivity {
 
                 ArrayList<String> photos = getAllShownImagesPath();
 
-                if (photos.size() > 0)
+                if (photos.size() > 0) {
                     new AnalysePhotos().execute(photos);
+                } else {
+                    dialog.dismiss();
+                }
             }
         });
 
@@ -114,7 +117,7 @@ public class MainActivity extends AppCompatActivity {
         return listOfAllImages;
     }
 
-     private void createResultList(List<List<String>> result, List<Bitmap> photos) {
+    private void createResultList(List<List<String>> result, List<Bitmap> photos) {
         RecyclerView.Adapter mAdapter = new ResultAdapter(photos, result, this);
         mRecyclerView.setAdapter(mAdapter);
         dialog.dismiss();

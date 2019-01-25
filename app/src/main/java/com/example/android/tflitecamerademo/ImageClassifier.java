@@ -38,152 +38,189 @@ import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 
-/** Classifies images with Tensorflow Lite. */
+/**
+ * Classifies images with Tensorflow Lite.
+ */
 public class ImageClassifier {
 
-  /** Tag for the {@link Log}. */
-  private static final String TAG = "TfLiteCameraDemo";
+    /**
+     * Tag for the {@link Log}.
+     */
+    private static final String TAG = "TfLiteCameraDemo";
 
-  /** Name of the model file stored in Assets. */
-  private static final String MODEL_PATH = "model.tflite";
+    /**
+     * Name of the model file stored in Assets.
+     */
+    private static final String MODEL_PATH = "model.tflite";
 
-  /** Name of the label file stored in Assets. */
-  private static final String LABEL_PATH = "labels.txt";
+    /**
+     * Name of the label file stored in Assets.
+     */
+    private static final String LABEL_PATH = "labels.txt";
 
-  /** Number of results to show in the UI. */
-  private static final int RESULTS_TO_SHOW = 2;
+    /**
+     * Number of results to show in the UI.
+     */
+    private static final int RESULTS_TO_SHOW = 2;
 
-  private static final int IMAGE_MEAN = 0;
-  private static final float IMAGE_STD = 255;
+    private static final int IMAGE_MEAN = 0;
+    private static final float IMAGE_STD = 255;
 
-  /** Dimensions of inputs. */
-  private static final int DIM_BATCH_SIZE = 1;
+    /**
+     * Dimensions of inputs.
+     */
+    private static final int DIM_BATCH_SIZE = 1;
 
-  private static final int DIM_PIXEL_SIZE = 3;
+    private static final int DIM_PIXEL_SIZE = 3;
 
-  static final int DIM_IMG_SIZE_X = 224;
-  static final int DIM_IMG_SIZE_Y = 224;
+    static final int DIM_IMG_SIZE_X = 224;
+    static final int DIM_IMG_SIZE_Y = 224;
 
 
-  /* Preallocated buffers for storing image data in. */
-  private int[] intValues = new int[DIM_IMG_SIZE_X * DIM_IMG_SIZE_Y];
+    /* Preallocated buffers for storing image data in. */
+    private int[] intValues = new int[DIM_IMG_SIZE_X * DIM_IMG_SIZE_Y];
 
-  /** An instance of the driver class to run model inference with Tensorflow Lite. */
-  private Interpreter tflite;
+    /**
+     * An instance of the driver class to run model inference with Tensorflow Lite.
+     */
+    private Interpreter tflite;
 
-  /** Labels corresponding to the output of the vision model. */
-  private List<String> labelList;
+    /**
+     * Labels corresponding to the output of the vision model.
+     */
+    private List<String> labelList;
 
-  /** A ByteBuffer to hold image data, to be feed into Tensorflow Lite as inputs. */
-  private ByteBuffer imgData = null;
+    /**
+     * A ByteBuffer to hold image data, to be feed into Tensorflow Lite as inputs.
+     */
+    private ByteBuffer imgData = null;
 
-  /** An array to hold inference results, to be feed into Tensorflow Lite as outputs. */
-  private byte[][] labelProbArray = null;
+    /**
+     * An array to hold inference results, to be feed into Tensorflow Lite as outputs.
+     */
+    private byte[][] labelProbArray = null;
 
-  private PriorityQueue<Map.Entry<String, Float>> sortedLabels =
-      new PriorityQueue<>(
-          RESULTS_TO_SHOW,
-          new Comparator<Map.Entry<String, Float>>() {
-            @Override
-            public int compare(Map.Entry<String, Float> o1, Map.Entry<String, Float> o2) {
-              return (o1.getValue()).compareTo(o2.getValue());
+    private PriorityQueue<Map.Entry<String, Float>> sortedLabels =
+            new PriorityQueue<>(
+                    RESULTS_TO_SHOW,
+                    new Comparator<Map.Entry<String, Float>>() {
+                        @Override
+                        public int compare(Map.Entry<String, Float> o1, Map.Entry<String, Float> o2) {
+                            return (o1.getValue()).compareTo(o2.getValue());
+                        }
+                    });
+
+    /**
+     * Initializes an {@code ImageClassifier}.
+     */
+    ImageClassifier(Activity activity) throws IOException {
+        tflite = new Interpreter((ByteBuffer) loadModelFile(activity));
+        labelList = loadLabelList(activity);
+        imgData =
+                ByteBuffer.allocateDirect(
+                        DIM_BATCH_SIZE * DIM_IMG_SIZE_X * DIM_IMG_SIZE_Y * DIM_PIXEL_SIZE);
+        imgData.order(ByteOrder.nativeOrder());
+        labelProbArray = new byte[1][labelList.size()];
+        Log.d(TAG, "Created a Tensorflow Lite Image Classifier.");
+    }
+
+    /**
+     * Classifies a frame from the preview stream.
+     */
+    List<String> classifyFrame(Bitmap bitmap) {
+        if (tflite == null) {
+            Log.e(TAG, "Image classifier has not been initialized; Skipped.");
+        }
+        convertBitmapToByteBuffer(bitmap);
+        // Here's where the magic happens!!!
+        long startTime = SystemClock.uptimeMillis();
+        tflite.run(imgData, labelProbArray);
+        long endTime = SystemClock.uptimeMillis();
+        Log.d(TAG, "Timecost to run model inference: " + Long.toString(endTime - startTime));
+        return printTopKLabels();
+    }
+
+    /**
+     * Closes tflite to release resources.
+     */
+    public void close() {
+        tflite.close();
+        tflite = null;
+    }
+
+    /**
+     * Reads label list from Assets.
+     */
+    private List<String> loadLabelList(Activity activity) throws IOException {
+        List<String> labelList = new ArrayList<String>();
+        BufferedReader reader =
+                new BufferedReader(new InputStreamReader(activity.getAssets().open(LABEL_PATH)));
+        String line;
+        while ((line = reader.readLine()) != null) {
+            labelList.add(line);
+        }
+        reader.close();
+        return labelList;
+    }
+
+    /**
+     * Memory-map the model file in Assets.
+     */
+    private MappedByteBuffer loadModelFile(Activity activity) throws IOException {
+        AssetFileDescriptor fileDescriptor = activity.getAssets().openFd(MODEL_PATH);
+        FileInputStream inputStream = new FileInputStream(fileDescriptor.getFileDescriptor());
+        FileChannel fileChannel = inputStream.getChannel();
+        long startOffset = fileDescriptor.getStartOffset();
+        long declaredLength = fileDescriptor.getDeclaredLength();
+        return fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength);
+    }
+
+    /**
+     * Writes Image data into a {@code ByteBuffer}.
+     */
+    private void convertBitmapToByteBuffer(Bitmap bitmap) {
+        if (imgData == null) {
+            return;
+        }
+
+        imgData.rewind();
+        bitmap.getPixels(intValues, 0, bitmap.getWidth(), 0, 0, bitmap.getWidth(), bitmap.getHeight());
+        // Convert the image to floating point.
+        int pixel = 0;
+        long startTime = SystemClock.uptimeMillis();
+
+        for (int i = 0; i < DIM_IMG_SIZE_X; ++i) {
+            for (int j = 0; j < DIM_IMG_SIZE_Y; ++j) {
+                final int val = intValues[pixel++];
+                imgData.put((byte) ((val >> 16) & 0xFF));
+                imgData.put((byte) ((val >> 8) & 0xFF));
+                imgData.put((byte) (val & 0xFF));
             }
-          });
+        }
 
-  /** Initializes an {@code ImageClassifier}. */
-  ImageClassifier(Activity activity) throws IOException {
-    tflite = new Interpreter(loadModelFile(activity));
-    labelList = loadLabelList(activity);
-    imgData =
-        ByteBuffer.allocateDirect(
-            DIM_BATCH_SIZE * DIM_IMG_SIZE_X * DIM_IMG_SIZE_Y * DIM_PIXEL_SIZE);
-    imgData.order(ByteOrder.nativeOrder());
-    labelProbArray = new byte[1][labelList.size()];
-    Log.d(TAG, "Created a Tensorflow Lite Image Classifier.");
-  }
-
-  /** Classifies a frame from the preview stream. */
-  List<String> classifyFrame(Bitmap bitmap) {
-    if (tflite == null) {
-      Log.e(TAG, "Image classifier has not been initialized; Skipped.");
-    }
-    convertBitmapToByteBuffer(bitmap);
-    // Here's where the magic happens!!!
-    long startTime = SystemClock.uptimeMillis();
-    tflite.run(imgData, labelProbArray);
-    long endTime = SystemClock.uptimeMillis();
-    Log.d(TAG, "Timecost to run model inference: " + Long.toString(endTime - startTime));
-    return printTopKLabels();
-  }
-
-  /** Closes tflite to release resources. */
-  public void close() {
-    tflite.close();
-    tflite = null;
-  }
-
-  /** Reads label list from Assets. */
-  private List<String> loadLabelList(Activity activity) throws IOException {
-    List<String> labelList = new ArrayList<String>();
-    BufferedReader reader =
-        new BufferedReader(new InputStreamReader(activity.getAssets().open(LABEL_PATH)));
-    String line;
-    while ((line = reader.readLine()) != null) {
-      labelList.add(line);
-    }
-    reader.close();
-    return labelList;
-  }
-
-  /** Memory-map the model file in Assets. */
-  private MappedByteBuffer loadModelFile(Activity activity) throws IOException {
-    AssetFileDescriptor fileDescriptor = activity.getAssets().openFd(MODEL_PATH);
-    FileInputStream inputStream = new FileInputStream(fileDescriptor.getFileDescriptor());
-    FileChannel fileChannel = inputStream.getChannel();
-    long startOffset = fileDescriptor.getStartOffset();
-    long declaredLength = fileDescriptor.getDeclaredLength();
-    return fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength);
-  }
-
-  /** Writes Image data into a {@code ByteBuffer}. */
-  private void convertBitmapToByteBuffer(Bitmap bitmap) {
-    if (imgData == null) {
-      return;
-    }
-    imgData.rewind();
-    bitmap.getPixels(intValues, 0, bitmap.getWidth(), 0, 0, bitmap.getWidth(), bitmap.getHeight());
-    // Convert the image to floating point.
-    int pixel = 0;
-    long startTime = SystemClock.uptimeMillis();
-    for (int i = 0; i < DIM_IMG_SIZE_X; ++i) {
-      for (int j = 0; j < DIM_IMG_SIZE_Y; ++j) {
-        final int val = intValues[pixel++];
-        imgData.put((byte) ((val >> 16) & 0xFF));
-        imgData.put((byte) ((val >> 8) & 0xFF));
-        imgData.put((byte) (val & 0xFF));
-      }
-    }
-    long endTime = SystemClock.uptimeMillis();
-    Log.d(TAG, "Timecost to put values into ByteBuffer: " + Long.toString(endTime - startTime));
-  }
-
-  /** Prints top-K labels, to be shown in UI as the results. */
-  private List <String> printTopKLabels() {
-    for (int i = 0; i < labelList.size(); ++i) {
-      sortedLabels.add(
-          new AbstractMap.SimpleEntry<>(labelList.get(i), (labelProbArray[0][i] & 0xff) / 255.0f));
-      if (sortedLabels.size() > RESULTS_TO_SHOW) {
-        sortedLabels.poll();
-      }
-    }
-    final int size = sortedLabels.size();
-    List<String> resultList = new ArrayList<>();
-    for (int i = 0; i < size; ++i) {
-      Map.Entry<String, Float> label = sortedLabels.poll();
-
-      resultList.add(label.getKey() + ":" + Float.toString(label.getValue()));
+        long endTime = SystemClock.uptimeMillis();
+        Log.d(TAG, "Timecost to put values into ByteBuffer: " + Long.toString(endTime - startTime));
     }
 
-    return resultList;
-  }
+    /**
+     * Prints top-K labels, to be shown in UI as the results.
+     */
+    private List<String> printTopKLabels() {
+        for (int i = 0; i < labelList.size(); ++i) {
+            sortedLabels.add(
+                    new AbstractMap.SimpleEntry<>(labelList.get(i), (labelProbArray[0][i] & 0xff) / 255.0f));
+            if (sortedLabels.size() > RESULTS_TO_SHOW) {
+                sortedLabels.poll();
+            }
+        }
+        final int size = sortedLabels.size();
+        List<String> resultList = new ArrayList<>();
+        for (int i = 0; i < size; ++i) {
+            Map.Entry<String, Float> label = sortedLabels.poll();
+
+            resultList.add(label.getKey() + ":" + Float.toString(label.getValue()));
+        }
+
+        return resultList;
+    }
 }

@@ -28,6 +28,7 @@
         android:supportsRtl="true"
         android:screenOrientation="portrait"
         android:theme="@style/AppTheme"
+        android:largeHeap="true"
         tools:ignore="GoogleAppIndexingWarning">
 
         <activity android:name="com.example.android.tflitecamerademo.MainActivity"
