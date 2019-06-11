@@ -21,6 +21,7 @@ import android.view.View;
 import android.widget.Button;
 
 import com.example.android.tflitecamerademo.Utils.MeasurePerformanceUtil;
+import com.google.firebase.FirebaseApp;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -39,13 +40,17 @@ public class MainActivity extends AppCompatActivity {
 
     private RecyclerView mRecyclerView;
 
-    private ImageClassifier classifier;
+    //private ImageClassifier classifier;
+
+    private NewImageClassifier newImageClassifier;
 
     private static final String TAG = "DEMO LITE";
 
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        FirebaseApp.initializeApp(this);
 
         Activity activity = this;
 
@@ -81,13 +86,14 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        classifier.close();
+        //classifier.close();
     }
 
     private void initTensorFlowAndLoadModel() {
         try {
-            classifier = new ImageClassifier(this);
-        } catch (IOException e) {
+            newImageClassifier = new NewImageClassifier(getAssets());
+            //classifier = new ImageClassifier(this);
+        } catch (Exception e) {
             Log.e(TAG, "Failed to initialize an image classifier.");
         }
     }
@@ -151,9 +157,13 @@ public class MainActivity extends AppCompatActivity {
 
                     measurePerformanceUtil.addStartTime();
 
-                    List<String> results = classifier.classifyFrame(sender.get(positionStart));
+                    List<String> results = newImageClassifier.classifyImage(sender.get(positionStart));
 
                     measurePerformanceUtil.logMeasuredTime("Recognized Image Time Single");
+
+                    if (results.isEmpty()) {
+                        return;
+                    }
 
                     if (results.get(1).contains("common")) {
                         imagesToRemove.add(sender.get(positionStart));
@@ -210,6 +220,11 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         protected void onPostExecute(List<List<String>> lists) {
+            if (lists.isEmpty()) {
+                dialog.dismiss();
+                return;
+            }
+
             for (int i = 0; i < loadedImages.size(); i++) {
                 Log.d("ResultList", loadedImages.get(i) + " :: " + lists.get(i).get(1));
             }
