@@ -2,15 +2,18 @@ package com.example.android.tflitecamerademo
 
 import android.content.res.AssetManager
 import android.graphics.Bitmap
-import android.graphics.Color
 import android.util.Log
 import com.google.firebase.ml.common.modeldownload.FirebaseLocalModel
 import com.google.firebase.ml.common.modeldownload.FirebaseModelManager
 import com.google.firebase.ml.custom.*
+import kotlinx.coroutines.*
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.util.*
-import kotlin.experimental.and
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.coroutineContext
+import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
 
 class NewImageClassifier(private val assetManager: AssetManager) {
 
@@ -21,24 +24,36 @@ class NewImageClassifier(private val assetManager: AssetManager) {
 
     init {
         val localSource = FirebaseLocalModel.Builder("model") // Assign a name to this model
-            .setAssetFilePath("model.tflite")
-            .build()
+                .setAssetFilePath("model.tflite")
+                .build()
         FirebaseModelManager.getInstance().registerLocalModel(localSource)
 
         val options = FirebaseModelOptions.Builder()
-            .setLocalModelName("model")
-            .build()
+                .setLocalModelName("model")
+                .build()
         interpreter = FirebaseModelInterpreter.getInstance(options)
 
         imageConverter = ImageConverter()
 
         inputOutputOptions = FirebaseModelInputOutputOptions.Builder()
-            .setInputFormat(0, FirebaseModelDataType.BYTE, intArrayOf(1, 224, 224, 3))
-            .setOutputFormat(0, FirebaseModelDataType.BYTE, intArrayOf(1, 2))
-            .build()
+                .setInputFormat(0, FirebaseModelDataType.BYTE, intArrayOf(1, 224, 224, 3))
+                .setOutputFormat(0, FirebaseModelDataType.BYTE, intArrayOf(1, 2))
+                .build()
     }
 
+
     fun classifyImage(bitmap: Bitmap): List<String> {
+        var result = listOf<String>()
+
+        runBlocking {
+            result = suspendClassifyImage(bitmap)
+        }
+
+        return result
+    }
+
+
+    private suspend fun suspendClassifyImage(bitmap: Bitmap): List<String> = suspendCoroutine { continuation ->
         val resultList = mutableListOf<String>()
 
         val byteBuffer = imageConverter.convertBitmapToByteBuffer(bitmap)
@@ -58,14 +73,15 @@ class NewImageClassifier(private val assetManager: AssetManager) {
 //        }
 
         val inputs = FirebaseModelInputs.Builder()
-            .add(byteBuffer) // add() as many input arrays as your model requires
-            .build()
+                .add(byteBuffer) // add() as many input arrays as your model requires
+                .build()
+
         interpreter?.run(inputs, inputOutputOptions)?.addOnSuccessListener {
             val output = it.getOutput<Array<ByteArray>>(0)
             val probabilities = output[0]
 
             val reader = BufferedReader(
-                InputStreamReader(assetManager.open("labels.txt")))
+                    InputStreamReader(assetManager.open("labels.txt")))
 //            for (i in probabilities.indices) {
 //                val label = reader.readLine()
 //                Log.i("MLKit", String.format("%s: %1.4b", label, probabilities[i]))
@@ -77,11 +93,12 @@ class NewImageClassifier(private val assetManager: AssetManager) {
             labelList.add(reader.readLine())
 
             val labelProbArray = Array(1) {
-                probabilities }
+                probabilities
+            }
 
             for (i in labelList.indices) {
                 sortedLabels.add(
-                    AbstractMap.SimpleEntry(labelList[i], (labelProbArray[0][i] and 0xff.toByte()) / 255.0f))
+                        AbstractMap.SimpleEntry(labelList[i], (labelProbArray[0][i].toInt() and 0xff) / 255.0f))
                 if (sortedLabels.size > 2) {
                     sortedLabels.poll()
                 }
@@ -93,15 +110,16 @@ class NewImageClassifier(private val assetManager: AssetManager) {
 
                 resultList.add(label.key + ":" + java.lang.Float.toString(label.value))
             }
-        }
-            ?.addOnFailureListener {
-                Log.e("MLKit", it.message?: "")
-            }
 
-        return resultList
+            continuation.resume(resultList)
+        }
+                ?.addOnFailureListener {
+                    continuation.resume(resultList)
+                    Log.e("MLKit", it.message ?: "")
+                }
     }
 
     private val sortedLabels = PriorityQueue<AbstractMap.SimpleEntry<String, Float>>(
-        2,
-        Comparator<AbstractMap.SimpleEntry<String, Float>> { o1, o2 -> o1.value.compareTo(o2.value) })
+            2,
+            Comparator<AbstractMap.SimpleEntry<String, Float>> { o1, o2 -> o1.value.compareTo(o2.value) })
 }
